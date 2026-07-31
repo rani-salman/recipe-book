@@ -6,6 +6,7 @@ import react from "@vitejs/plugin-react";
 // This is what makes GitHub Pages find your JS/CSS assets correctly.
 const REPO_NAME = "recipe-book";
 
+
 export default defineConfig({
   plugins: [react()],
   base: process.env.NODE_ENV === "production" ? `/${REPO_NAME}/` : "/",

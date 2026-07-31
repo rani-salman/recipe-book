@@ -15,12 +15,34 @@ const BLANK_FORM = {
   price_source: "Market estimate",
 };
 
+const EDITABLE_NUMERIC_FIELDS = ["calories", "protein", "fat", "sugar", "fiber", "pack_size_g", "price_sar"];
+
+function toDraft(ing) {
+  return {
+    name: ing.name,
+    category: ing.category,
+    calories: ing.calories,
+    protein: ing.protein,
+    fat: ing.fat,
+    sugar: ing.sugar,
+    fiber: ing.fiber,
+    pack_label: ing.pack_label,
+    pack_size_g: ing.pack_size_g,
+    price_sar: ing.price_sar,
+    price_source: ing.price_source,
+  };
+}
+
 export default function IngredientsPage({ ingredients, loading, onChanged }) {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
-  const [editingPrice, setEditingPrice] = useState({}); // { [id]: value }
   const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState(BLANK_FORM);
+
+  const [editingId, setEditingId] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [savingId, setSavingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const categories = useMemo(() => {
     const set = new Set(ingredients.map((i) => i.category));
@@ -35,19 +57,62 @@ export default function IngredientsPage({ ingredients, loading, onChanged }) {
     });
   }, [ingredients, search, categoryFilter]);
 
-  const commitPrice = async (ing) => {
-    const raw = editingPrice[ing.id];
-    if (raw === undefined) return;
-    const value = Number(raw);
-    if (Number.isNaN(value) || value < 0) return;
-    if (value === ing.price_sar) return;
+  const startEdit = (ing) => {
+    setEditingId(ing.id);
+    setDraft(toDraft(ing));
+  };
 
-    const { error } = await supabase
-      .from("ingredients")
-      .update({ price_sar: value, price_source: "Manually updated", updated_at: new Date().toISOString() })
-      .eq("id", ing.id);
+  const cancelEdit = () => {
+    setEditingId(null);
+    setDraft(null);
+  };
+
+  const updateDraft = (field, value) => {
+    setDraft((d) => ({ ...d, [field]: value }));
+  };
+
+  const saveEdit = async (ing) => {
+    if (!draft.name.trim() || !draft.category.trim()) {
+      alert("Name and category can't be empty.");
+      return;
+    }
+    setSavingId(ing.id);
+    const payload = { ...draft, price_source: "Manually updated", updated_at: new Date().toISOString() };
+    for (const f of EDITABLE_NUMERIC_FIELDS) {
+      payload[f] = Number(payload[f]);
+      if (Number.isNaN(payload[f])) {
+        alert(`"${f}" must be a number.`);
+        setSavingId(null);
+        return;
+      }
+    }
+    const { error } = await supabase.from("ingredients").update(payload).eq("id", ing.id);
+    setSavingId(null);
     if (error) {
-      alert("Couldn't update price: " + error.message);
+      alert("Couldn't save changes: " + error.message);
+      return;
+    }
+    setEditingId(null);
+    setDraft(null);
+    onChanged();
+  };
+
+  const deleteIngredient = async (ing) => {
+    if (
+      !confirm(
+        `Delete "${ing.name}"? Recipes that already use it will keep their saved totals, but you won't be able to select it in new recipes, and the recipe row referencing it will fail to load unless removed first.`
+      )
+    )
+      return;
+    setDeletingId(ing.id);
+    const { error } = await supabase.from("ingredients").delete().eq("id", ing.id);
+    setDeletingId(null);
+    if (error) {
+      alert(
+        "Couldn't delete: " +
+        error.message +
+        "\n\nThis usually means a recipe still uses this ingredient -- remove it from those recipes first."
+      );
       return;
     }
     onChanged();
@@ -158,43 +223,135 @@ export default function IngredientsPage({ ingredients, loading, onChanged }) {
               <th>Fat</th>
               <th>Sugar</th>
               <th>Fiber</th>
-              <th>Pack</th>
+              <th>Pack label</th>
+              <th>Pack size (g/ml)</th>
               <th>Price (SAR)</th>
               <th>Source</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((ing) => (
-              <tr key={ing.id}>
-                <td className="name-cell">{ing.name}</td>
-                <td>
-                  <span className="badge">{ing.category}</span>
-                </td>
-                <td>{ing.calories}</td>
-                <td>{ing.protein}</td>
-                <td>{ing.fat}</td>
-                <td>{ing.sugar}</td>
-                <td>{ing.fiber}</td>
-                <td>{ing.pack_label}</td>
-                <td>
-                  <input
-                    className="price-input"
-                    type="number"
-                    step="0.01"
-                    defaultValue={ing.price_sar}
-                    onChange={(e) => setEditingPrice((p) => ({ ...p, [ing.id]: e.target.value }))}
-                    onBlur={() => commitPrice(ing)}
-                  />
-                </td>
-                <td>
-                  <span
-                    className={`source-tag ${ing.price_source === "Carrefour KSA" ? "confirmed" : "estimate"}`}
-                  >
-                    {ing.price_source}
-                  </span>
-                </td>
-              </tr>
-            ))}
+            {filtered.map((ing) => {
+              const isEditing = editingId === ing.id;
+              const isSaving = savingId === ing.id;
+              const isDeleting = deletingId === ing.id;
+
+              if (!isEditing) {
+                return (
+                  <tr key={ing.id}>
+                    <td className="name-cell">{ing.name}</td>
+                    <td>
+                      <span className="badge">{ing.category}</span>
+                    </td>
+                    <td>{ing.calories}</td>
+                    <td>{ing.protein}</td>
+                    <td>{ing.fat}</td>
+                    <td>{ing.sugar}</td>
+                    <td>{ing.fiber}</td>
+                    <td>{ing.pack_label}</td>
+                    <td>{ing.pack_size_g}</td>
+                    <td>{Number(ing.price_sar).toFixed(2)}</td>
+                    <td>
+                      <span
+                        className={`source-tag ${ing.price_source === "Carrefour KSA" ? "confirmed" : "estimate"}`}
+                      >
+                        {ing.price_source}
+                      </span>
+                    </td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <button className="btn btn-ghost" onClick={() => startEdit(ing)}>
+                        Edit
+                      </button>{" "}
+                      <button className="btn btn-danger" onClick={() => deleteIngredient(ing)} disabled={isDeleting}>
+                        {isDeleting ? "..." : "Delete"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              }
+
+              return (
+                <tr key={ing.id} style={{ background: "var(--accent-soft)" }}>
+                  <td className="name-cell">
+                    <input value={draft.name} onChange={(e) => updateDraft("name", e.target.value)} style={{ width: 160 }} />
+                  </td>
+                  <td>
+                    <input value={draft.category} onChange={(e) => updateDraft("category", e.target.value)} style={{ width: 110 }} />
+                  </td>
+                  <td>
+                    <input
+                      className="price-input"
+                      type="number"
+                      value={draft.calories}
+                      onChange={(e) => updateDraft("calories", e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="price-input"
+                      type="number"
+                      value={draft.protein}
+                      onChange={(e) => updateDraft("protein", e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="price-input"
+                      type="number"
+                      value={draft.fat}
+                      onChange={(e) => updateDraft("fat", e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="price-input"
+                      type="number"
+                      value={draft.sugar}
+                      onChange={(e) => updateDraft("sugar", e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="price-input"
+                      type="number"
+                      value={draft.fiber}
+                      onChange={(e) => updateDraft("fiber", e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input value={draft.pack_label} onChange={(e) => updateDraft("pack_label", e.target.value)} style={{ width: 110 }} />
+                  </td>
+                  <td>
+                    <input
+                      className="price-input"
+                      type="number"
+                      value={draft.pack_size_g}
+                      onChange={(e) => updateDraft("pack_size_g", e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="price-input"
+                      type="number"
+                      step="0.01"
+                      value={draft.price_sar}
+                      onChange={(e) => updateDraft("price_sar", e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <span className="source-tag estimate">will become "Manually updated"</span>
+                  </td>
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    <button className="btn btn-accent" onClick={() => saveEdit(ing)} disabled={isSaving}>
+                      {isSaving ? "Saving..." : "Save"}
+                    </button>{" "}
+                    <button className="btn btn-ghost" onClick={cancelEdit} disabled={isSaving}>
+                      Cancel
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
