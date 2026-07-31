@@ -4,11 +4,22 @@ import { supabase } from "../supabaseClient";
 let tempIdCounter = 0;
 const newTempId = () => `temp-${++tempIdCounter}`;
 
+// Resolve however the user entered a quantity (grams or servings) into
+// actual grams, using the ingredient's serving_size_g as the conversion.
+function resolveGrams(row, ing) {
+  const value = Number(row.quantity_value) || 0;
+  if (row.quantity_type === "servings") {
+    const servingSize = ing?.serving_size_g || 100;
+    return value * servingSize;
+  }
+  return value;
+}
+
 export default function RecipeDetail({ recipeId, mealCategory, ingredients, onBack }) {
   const [name, setName] = useState("");
   const [rating, setRating] = useState(0);
   const [notes, setNotes] = useState("");
-  const [rows, setRows] = useState([]); // { rowId, ingredient_id, quantity_g }
+  const [rows, setRows] = useState([]); // { rowId, ingredient_id, quantity_type, quantity_value }
   const [loading, setLoading] = useState(!!recipeId);
   const [saving, setSaving] = useState(false);
 
@@ -44,7 +55,8 @@ export default function RecipeDetail({ recipeId, mealCategory, ingredients, onBa
         (ris || []).map((ri) => ({
           rowId: ri.id,
           ingredient_id: ri.ingredient_id,
-          quantity_g: ri.quantity_g,
+          quantity_type: ri.quantity_type || "grams",
+          quantity_value: ri.quantity_value ?? ri.quantity_g,
         }))
       );
       setLoading(false);
@@ -54,7 +66,7 @@ export default function RecipeDetail({ recipeId, mealCategory, ingredients, onBa
   const addRow = () => {
     setRows((prev) => [
       ...prev,
-      { rowId: newTempId(), ingredient_id: ingredients[0]?.id || "", quantity_g: 100 },
+      { rowId: newTempId(), ingredient_id: ingredients[0]?.id || "", quantity_type: "grams", quantity_value: 100 },
     ]);
   };
 
@@ -70,17 +82,17 @@ export default function RecipeDetail({ recipeId, mealCategory, ingredients, onBa
     return rows.reduce(
       (acc, row) => {
         const ing = ingredientsById[row.ingredient_id];
-        const qty = Number(row.quantity_g) || 0;
         if (!ing) return acc;
-        const factor = qty / 100;
-        const pricePer100g = ing.price_sar / ing.pack_size_g * 100;
+        const grams = resolveGrams(row, ing);
+        const factor = grams / (ing.serving_size_g || 100);
+        const pricePerGram = ing.price_sar / ing.pack_size_g;
         return {
           calories: acc.calories + ing.calories * factor,
           protein: acc.protein + ing.protein * factor,
           fat: acc.fat + ing.fat * factor,
           sugar: acc.sugar + ing.sugar * factor,
           fiber: acc.fiber + ing.fiber * factor,
-          price: acc.price + (pricePer100g * factor),
+          price: acc.price + pricePerGram * grams,
         };
       },
       { calories: 0, protein: 0, fat: 0, sugar: 0, fiber: 0, price: 0 }
@@ -103,7 +115,6 @@ export default function RecipeDetail({ recipeId, mealCategory, ingredients, onBa
           .eq("id", currentId);
         if (error) throw error;
 
-        // Simplest sync strategy for a personal-scale app: wipe and re-insert.
         const { error: delErr } = await supabase
           .from("recipe_ingredients")
           .delete()
@@ -119,14 +130,19 @@ export default function RecipeDetail({ recipeId, mealCategory, ingredients, onBa
         currentId = data.id;
       }
 
-      const validRows = rows.filter((r) => r.ingredient_id && Number(r.quantity_g) > 0);
+      const validRows = rows.filter((r) => r.ingredient_id && Number(r.quantity_value) > 0);
       if (validRows.length > 0) {
         const { error: insErr } = await supabase.from("recipe_ingredients").insert(
-          validRows.map((r) => ({
-            recipe_id: currentId,
-            ingredient_id: r.ingredient_id,
-            quantity_g: Number(r.quantity_g),
-          }))
+          validRows.map((r) => {
+            const ing = ingredientsById[r.ingredient_id];
+            return {
+              recipe_id: currentId,
+              ingredient_id: r.ingredient_id,
+              quantity_type: r.quantity_type,
+              quantity_value: Number(r.quantity_value),
+              quantity_g: resolveGrams(r, ing),
+            };
+          })
         );
         if (insErr) throw insErr;
       }
@@ -197,42 +213,64 @@ export default function RecipeDetail({ recipeId, mealCategory, ingredients, onBa
       <table className="ledger">
         <thead>
           <tr>
-            <th style={{ width: "45%" }}>Ingredient</th>
-            <th>Quantity (g)</th>
+            <th style={{ width: "38%" }}>Ingredient</th>
+            <th>Input as</th>
+            <th>Amount</th>
+            <th>= grams</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.rowId}>
-              <td className="name-cell">
-                <select
-                  value={row.ingredient_id}
-                  onChange={(e) => updateRow(row.rowId, { ingredient_id: e.target.value })}
-                >
-                  {ingredients.map((ing) => (
-                    <option key={ing.id} value={ing.id}>
-                      {ing.name}
+          {rows.map((row) => {
+            const ing = ingredientsById[row.ingredient_id];
+            const grams = ing ? resolveGrams(row, ing) : 0;
+            return (
+              <tr key={row.rowId}>
+                <td className="name-cell">
+                  <select
+                    className="ingredient-select"
+                    value={row.ingredient_id}
+                    onChange={(e) => updateRow(row.rowId, { ingredient_id: e.target.value })}
+                  >
+                    {ingredients.map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {i.name}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td>
+                  <select
+                    value={row.quantity_type}
+                    onChange={(e) => updateRow(row.rowId, { quantity_type: e.target.value })}
+                  >
+                    <option value="grams">Grams</option>
+                    <option value="servings">
+                      Servings{ing ? ` (${ing.serving_label})` : ""}
                     </option>
-                  ))}
-                </select>
-              </td>
-              <td>
-                <input
-                  className="qty-input"
-                  type="number"
-                  min="0"
-                  value={row.quantity_g}
-                  onChange={(e) => updateRow(row.rowId, { quantity_g: e.target.value })}
-                />
-              </td>
-              <td>
-                <button className="btn btn-ghost" onClick={() => removeRow(row.rowId)}>
-                  Remove
-                </button>
-              </td>
-            </tr>
-          ))}
+                  </select>
+                </td>
+                <td>
+                  <input
+                    className="qty-input"
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={row.quantity_value}
+                    onChange={(e) => updateRow(row.rowId, { quantity_value: e.target.value })}
+                  />
+                </td>
+                <td style={{ color: "var(--ink-soft)" }}>
+                  {row.quantity_type === "servings" ? `${grams.toFixed(0)} g` : "—"}
+                </td>
+                <td>
+                  <button className="btn btn-ghost" onClick={() => removeRow(row.rowId)}>
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 

@@ -9,13 +9,15 @@ const BLANK_FORM = {
   fat: 0,
   sugar: 0,
   fiber: 0,
+  serving_size_g: 100,
+  serving_label: "100 g",
   pack_label: "1 kg",
   pack_size_g: 1000,
   price_sar: 0,
   price_source: "Market estimate",
 };
 
-const EDITABLE_NUMERIC_FIELDS = ["calories", "protein", "fat", "sugar", "fiber", "pack_size_g", "price_sar"];
+const EDITABLE_NUMERIC_FIELDS = ["calories", "protein", "fat", "sugar", "fiber", "serving_size_g", "pack_size_g", "price_sar"];
 
 function toDraft(ing) {
   return {
@@ -26,6 +28,8 @@ function toDraft(ing) {
     fat: ing.fat,
     sugar: ing.sugar,
     fiber: ing.fiber,
+    serving_size_g: ing.serving_size_g,
+    serving_label: ing.serving_label,
     pack_label: ing.pack_label,
     pack_size_g: ing.pack_size_g,
     price_sar: ing.price_sar,
@@ -80,8 +84,8 @@ export default function IngredientsPage({ ingredients, loading, onChanged }) {
     const payload = { ...draft, price_source: "Manually updated", updated_at: new Date().toISOString() };
     for (const f of EDITABLE_NUMERIC_FIELDS) {
       payload[f] = Number(payload[f]);
-      if (Number.isNaN(payload[f])) {
-        alert(`"${f}" must be a number.`);
+      if (Number.isNaN(payload[f]) || (f === "serving_size_g" && payload[f] <= 0)) {
+        alert(`"${f}" must be a valid number${f === "serving_size_g" ? " greater than 0" : ""}.`);
         setSavingId(null);
         return;
       }
@@ -127,6 +131,7 @@ export default function IngredientsPage({ ingredients, loading, onChanged }) {
       fat: Number(form.fat),
       sugar: Number(form.sugar),
       fiber: Number(form.fiber),
+      serving_size_g: Number(form.serving_size_g),
       pack_size_g: Number(form.pack_size_g),
       price_sar: Number(form.price_sar),
     });
@@ -164,6 +169,12 @@ export default function IngredientsPage({ ingredients, loading, onChanged }) {
 
       {showAddForm && (
         <form className="card" style={{ padding: 18, marginBottom: 16 }} onSubmit={handleAddIngredient}>
+          <p style={{ fontSize: 12.5, color: "var(--ink-soft)", marginTop: 0 }}>
+            Enter Calories/Protein/Fat/Sugar/Fiber for whatever "Serving size" you set below. For a weighed
+            ingredient like rice or chicken, use a 100&nbsp;g serving (the default). For something sold in units
+            -- a protein scoop, an egg, a slice of bread -- set the serving size to match the label, e.g. 30&nbsp;g
+            for "1 scoop".
+          </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
             <div className="field">
               <label>Name</label>
@@ -174,23 +185,39 @@ export default function IngredientsPage({ ingredients, loading, onChanged }) {
               <input required value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
             </div>
             <div className="field">
-              <label>Calories /100g</label>
+              <label>Serving size (g)</label>
+              <input
+                type="number"
+                value={form.serving_size_g}
+                onChange={(e) => setForm({ ...form, serving_size_g: e.target.value })}
+              />
+            </div>
+            <div className="field">
+              <label>Serving label</label>
+              <input
+                placeholder='e.g. "1 scoop (30 g)"'
+                value={form.serving_label}
+                onChange={(e) => setForm({ ...form, serving_label: e.target.value })}
+              />
+            </div>
+            <div className="field">
+              <label>Calories / serving</label>
               <input type="number" value={form.calories} onChange={(e) => setForm({ ...form, calories: e.target.value })} />
             </div>
             <div className="field">
-              <label>Protein /100g</label>
+              <label>Protein / serving</label>
               <input type="number" value={form.protein} onChange={(e) => setForm({ ...form, protein: e.target.value })} />
             </div>
             <div className="field">
-              <label>Fat /100g</label>
+              <label>Fat / serving</label>
               <input type="number" value={form.fat} onChange={(e) => setForm({ ...form, fat: e.target.value })} />
             </div>
             <div className="field">
-              <label>Sugar /100g</label>
+              <label>Sugar / serving</label>
               <input type="number" value={form.sugar} onChange={(e) => setForm({ ...form, sugar: e.target.value })} />
             </div>
             <div className="field">
-              <label>Fiber /100g</label>
+              <label>Fiber / serving</label>
               <input type="number" value={form.fiber} onChange={(e) => setForm({ ...form, fiber: e.target.value })} />
             </div>
             <div className="field">
@@ -218,6 +245,7 @@ export default function IngredientsPage({ ingredients, loading, onChanged }) {
             <tr>
               <th>Ingredient</th>
               <th>Category</th>
+              <th>Serving</th>
               <th>Kcal</th>
               <th>Protein</th>
               <th>Fat</th>
@@ -243,6 +271,7 @@ export default function IngredientsPage({ ingredients, loading, onChanged }) {
                     <td>
                       <span className="badge">{ing.category}</span>
                     </td>
+                    <td>{ing.serving_label}</td>
                     <td>{ing.calories}</td>
                     <td>{ing.protein}</td>
                     <td>{ing.fat}</td>
@@ -270,73 +299,139 @@ export default function IngredientsPage({ ingredients, loading, onChanged }) {
                 );
               }
 
+              const servingBasis = draft.serving_size_g || "?";
+
               return (
                 <tr key={ing.id} style={{ background: "var(--accent-soft)" }}>
                   <td className="name-cell">
-                    <input value={draft.name} onChange={(e) => updateDraft("name", e.target.value)} style={{ width: 160 }} />
+                    <div className="edit-cell">
+                      <span className="edit-cell-label">Name</span>
+                      <input value={draft.name} onChange={(e) => updateDraft("name", e.target.value)} style={{ width: 160 }} />
+                    </div>
                   </td>
                   <td>
-                    <input value={draft.category} onChange={(e) => updateDraft("category", e.target.value)} style={{ width: 110 }} />
+                    <div className="edit-cell">
+                      <span className="edit-cell-label">Category</span>
+                      <input value={draft.category} onChange={(e) => updateDraft("category", e.target.value)} style={{ width: 110 }} />
+                    </div>
                   </td>
                   <td>
-                    <input
-                      className="price-input"
-                      type="number"
-                      value={draft.calories}
-                      onChange={(e) => updateDraft("calories", e.target.value)}
-                    />
+                    <div className="edit-cell">
+                      <span className="edit-cell-label">Serving size (g)</span>
+                      <input
+                        className="price-input"
+                        style={{ width: 80 }}
+                        type="number"
+                        step="any"
+                        value={draft.serving_size_g}
+                        onChange={(e) => updateDraft("serving_size_g", e.target.value)}
+                      />
+                    </div>
+                    <div className="edit-cell" style={{ marginTop: 6 }}>
+                      <span className="edit-cell-label">Serving label</span>
+                      <input
+                        style={{ width: 140 }}
+                        value={draft.serving_label}
+                        onChange={(e) => updateDraft("serving_label", e.target.value)}
+                      />
+                    </div>
                   </td>
                   <td>
-                    <input
-                      className="price-input"
-                      type="number"
-                      value={draft.protein}
-                      onChange={(e) => updateDraft("protein", e.target.value)}
-                    />
+                    <div className="edit-cell">
+                      <span className="edit-cell-label">Kcal /{servingBasis}g</span>
+                      <input
+                        className="price-input"
+                        style={{ width: 90 }}
+                        type="number"
+                        step="any"
+                        value={draft.calories}
+                        onChange={(e) => updateDraft("calories", e.target.value)}
+                      />
+                    </div>
                   </td>
                   <td>
-                    <input
-                      className="price-input"
-                      type="number"
-                      value={draft.fat}
-                      onChange={(e) => updateDraft("fat", e.target.value)}
-                    />
+                    <div className="edit-cell">
+                      <span className="edit-cell-label">Protein /{servingBasis}g</span>
+                      <input
+                        className="price-input"
+                        style={{ width: 90 }}
+                        type="number"
+                        step="any"
+                        value={draft.protein}
+                        onChange={(e) => updateDraft("protein", e.target.value)}
+                      />
+                    </div>
                   </td>
                   <td>
-                    <input
-                      className="price-input"
-                      type="number"
-                      value={draft.sugar}
-                      onChange={(e) => updateDraft("sugar", e.target.value)}
-                    />
+                    <div className="edit-cell">
+                      <span className="edit-cell-label">Fat /{servingBasis}g</span>
+                      <input
+                        className="price-input"
+                        style={{ width: 90 }}
+                        type="number"
+                        step="any"
+                        value={draft.fat}
+                        onChange={(e) => updateDraft("fat", e.target.value)}
+                      />
+                    </div>
                   </td>
                   <td>
-                    <input
-                      className="price-input"
-                      type="number"
-                      value={draft.fiber}
-                      onChange={(e) => updateDraft("fiber", e.target.value)}
-                    />
+                    <div className="edit-cell">
+                      <span className="edit-cell-label">Sugar /{servingBasis}g</span>
+                      <input
+                        className="price-input"
+                        style={{ width: 90 }}
+                        type="number"
+                        step="any"
+                        value={draft.sugar}
+                        onChange={(e) => updateDraft("sugar", e.target.value)}
+                      />
+                    </div>
                   </td>
                   <td>
-                    <input value={draft.pack_label} onChange={(e) => updateDraft("pack_label", e.target.value)} style={{ width: 110 }} />
+                    <div className="edit-cell">
+                      <span className="edit-cell-label">Fiber /{servingBasis}g</span>
+                      <input
+                        className="price-input"
+                        style={{ width: 90 }}
+                        type="number"
+                        step="any"
+                        value={draft.fiber}
+                        onChange={(e) => updateDraft("fiber", e.target.value)}
+                      />
+                    </div>
                   </td>
                   <td>
-                    <input
-                      className="price-input"
-                      type="number"
-                      value={draft.pack_size_g}
-                      onChange={(e) => updateDraft("pack_size_g", e.target.value)}
-                    />
+                    <div className="edit-cell">
+                      <span className="edit-cell-label">Pack label</span>
+                      <input value={draft.pack_label} onChange={(e) => updateDraft("pack_label", e.target.value)} style={{ width: 120 }} />
+                    </div>
                   </td>
                   <td>
-                    <input
-                      className="price-input"
-                      type="number"
-                      step="0.01"
-                      value={draft.price_sar}
-                      onChange={(e) => updateDraft("price_sar", e.target.value)}
-                    />
+                    <div className="edit-cell">
+                      <span className="edit-cell-label">Pack size g/ml</span>
+                      <input
+                        className="price-input"
+                        style={{ width: 90 }}
+                        type="number"
+                        step="any"
+                        value={draft.pack_size_g}
+                        onChange={(e) => updateDraft("pack_size_g", e.target.value)}
+                      />
+                    </div>
+                  </td>
+                  <td>
+                    <div className="edit-cell">
+                      <span className="edit-cell-label">Price SAR</span>
+                      <input
+                        className="price-input"
+                        style={{ width: 90 }}
+                        type="number"
+                        step="0.01"
+                        value={draft.price_sar}
+                        onChange={(e) => updateDraft("price_sar", e.target.value)}
+                      />
+                    </div>
                   </td>
                   <td>
                     <span className="source-tag estimate">will become "Manually updated"</span>
