@@ -1,0 +1,443 @@
+/* ===================================================================
+   Design tokens
+   Palette: sage paper background, deep forest ink, warm ochre accent,
+   brick used sparingly for price/cost. Fraunces for display, Inter for
+   body copy, IBM Plex Mono for anything numeric (a "kitchen ledger"
+   feel that separates data from prose).
+   =================================================================== */
+:root {
+  --bg: #eef2ea;
+  --paper: #f9faf6;
+  --ink: #1f3a2e;
+  --ink-soft: #4b5f54;
+  --line: #d7ddd1;
+  --accent: #c98a2c;
+  --accent-soft: #f1ddb0;
+  --price: #8a3b2e;
+  --price-soft: #f2ddd6;
+  --white: #ffffff;
+
+  --font-display: "Fraunces", serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(31, 58, 46, 0.06), 0 4px 16px rgba(31, 58, 46, 0.06);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+}
+
+.app-shell {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 28px 20px 80px;
+}
+
+/* ---------- Header ---------- */
+.app-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.app-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 30px;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.app-title span {
+  color: var(--accent);
+  font-style: italic;
+}
+
+.app-subtitle {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+
+/* ---------- Tabs (index-card style) ---------- */
+.tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.tab {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-bottom: none;
+  padding: 9px 16px 8px;
+  border-radius: 8px 8px 0 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transform: translateY(2px);
+  transition: transform 0.12s ease, color 0.12s ease;
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tab.active {
+  background: var(--ink);
+  color: var(--white);
+  transform: translateY(0);
+  font-weight: 600;
+}
+
+/* ---------- Cards ---------- */
+.card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.recipe-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.recipe-card {
+  padding: 16px;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recipe-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(31, 58, 46, 0.12);
+}
+
+.recipe-card h3 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.recipe-card .stars {
+  color: var(--accent);
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+.recipe-card .meta-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  border-top: 1px dashed var(--line);
+  padding-top: 8px;
+}
+
+.recipe-card .price-tag {
+  color: var(--price);
+  font-weight: 500;
+}
+
+.new-recipe-card {
+  border: 1.5px dashed var(--line);
+  background: transparent;
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 96px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.new-recipe-card:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------- Forms ---------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.field label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+input,
+select,
+textarea {
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--white);
+  color: var(--ink);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.btn {
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 7px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.12s ease;
+}
+
+.btn:hover {
+  opacity: 0.88;
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--white);
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: var(--white);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+}
+
+.btn-danger {
+  background: var(--price-soft);
+  color: var(--price);
+}
+
+/* ---------- Recipe detail: ingredient ledger ---------- */
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.ledger {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.ledger th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--ink);
+  padding: 6px 8px;
+}
+
+.ledger td {
+  padding: 7px 8px;
+  border-bottom: 1px dashed var(--line);
+  font-family: var(--font-mono);
+  vertical-align: middle;
+}
+
+.ledger td.name-cell {
+  font-family: var(--font-body);
+}
+
+.ledger select {
+  min-width: 200px;
+}
+
+.qty-input {
+  width: 72px;
+  text-align: right;
+}
+
+.totals-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  background: var(--ink);
+  color: var(--white);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-top: 18px;
+  font-family: var(--font-mono);
+}
+
+.totals-strip .item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.totals-strip .item .label {
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #b9c8bf;
+}
+
+.totals-strip .item .value {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.totals-strip .price .value {
+  color: var(--accent-soft);
+}
+
+/* ---------- Ingredients table ---------- */
+.ingredients-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.ing-table-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+}
+
+.ing-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: var(--paper);
+}
+
+.ing-table th {
+  position: sticky;
+  top: 0;
+  background: var(--ink);
+  color: var(--white);
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.ing-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+}
+
+.ing-table td.name-cell {
+  font-family: var(--font-body);
+  font-weight: 500;
+}
+
+.ing-table tr:nth-child(even) td {
+  background: rgba(31, 58, 46, 0.02);
+}
+
+.badge {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: #7a5a12;
+}
+
+.source-tag {
+  font-family: var(--font-body);
+  font-size: 11px;
+}
+
+.source-tag.confirmed {
+  color: #2c6e4f;
+}
+
+.source-tag.estimate {
+  color: var(--ink-soft);
+}
+
+.price-input {
+  width: 80px;
+  font-family: var(--font-mono);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--ink-soft);
+}
+
+.loading-state {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .app-header {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .detail-header {
+    flex-direction: column;
+  }
+}
